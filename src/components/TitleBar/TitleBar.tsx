@@ -415,7 +415,7 @@ export default function TitleBar() {
       if ('showDirectoryPicker' in window) {
         try {
           // @ts-ignore
-          const dirHandle = await window.showDirectoryPicker();
+          const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
           closeAllTabs();
           const ws = {
             id: `local-${Date.now()}`,
