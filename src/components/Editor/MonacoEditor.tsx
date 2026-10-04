@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
 import MonacoEditorReact, { OnMount, OnChange } from '@monaco-editor/react';
+import { Play } from 'lucide-react';
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore } from '../../store/editorStore';
 import { useSettingsStore } from '../../store/settingsStore';
@@ -18,7 +19,6 @@ import { setMonacoInstance } from '../../services/extensionRuntime';
 let smartCompletionProvidersRegistered = false;
 let editorThemesRegistered = false;
 let inlineCompletionProviderRegistered = false;
-const EMPTY_EDITOR_BACKGROUND_IMAGE = 'https://img.freepik.com/premium-photo/elegant-dark-background-designs_1199394-20502.jpg';
 
 interface MonacoEditorProps {
   tabId: string;
@@ -55,14 +55,14 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
   const { updateTabContent, updateCursorPosition, saveTab, settings } = useEditorStore();
   const installedExtensions = useExtensionStore((state) => state.installed);
   const { theme } = useSettingsStore();
-  const { addNotification, setActiveSidebarPanel, setSidebarVisible, setRightPanelVisible } = useUIStore();
+  const { addNotification, setActiveSidebarPanel, setSidebarVisible, setRightPanelVisible, setBottomPanelVisible, setActiveBottomPanel } = useUIStore();
 
   const monacoTheme = theme === 'light'
     ? 'ai-web-ide-light-plus'
     : theme === 'high-contrast'
       ? 'hc-black'
       : 'ai-web-ide-cursor-dark';
-  const showEmptyEditorBackground = filePath.startsWith('/untitled/') && content.trim().length === 0;
+
 
   const handleBeforeMount = useCallback(async (monaco: typeof Monaco) => {
     registerEditorThemes(monaco);
@@ -80,8 +80,7 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
     // and theme services can use the real Monaco API
     setMonacoInstance(monaco);
 
-    // Set editor content
-    editor.setValue(content);
+    // The React wrapper will set the initial value automatically.
 
     // Track cursor position
     editor.onDidChangeCursorPosition((e: Monaco.editor.ICursorPositionChangedEvent) => {
@@ -686,11 +685,14 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
     return () => window.removeEventListener('ai-web-ide:editor-command', runCommand);
   }, []);
 
-  // Update content when tab changes
+  // Update content when file changes externally (e.g. AI or formatting)
   useEffect(() => {
-    if (editorRef.current && editorRef.current.getValue() !== content) {
+    if (editorRef.current && monacoRef.current && editorRef.current.getValue() !== content) {
       const model = editorRef.current.getModel();
-      if (model) {
+      const currentUri = filePath.startsWith('file://') ? filePath : `file:///${filePath.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+      // Only push edits if the active model matches this component's filePath
+      // @monaco-editor/react handles swapping models when filePath changes
+      if (model && model.uri.toString() === monacoRef.current.Uri.parse(currentUri).toString()) {
         editorRef.current.pushUndoStop();
         model.pushEditOperations(
           [],
@@ -700,20 +702,74 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
         editorRef.current.pushUndoStop();
       }
     }
-  }, [content]);
+  }, [content, filePath]);
+
+  // Ensure the filePath is formatted as a proper file URI for Monaco language services
+  const fileUri = filePath.startsWith('file://') 
+    ? filePath 
+    : `file:///${filePath.replace(/\\/g, '/').replace(/^\/?/, '')}`;
+
+  const handleRunCurrentFile = useCallback(() => {
+    let command = '';
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    
+    // Extract relative path (e.g., 'src/utils/math.ts' from '/workspace/my-project/src/utils/math.ts')
+    let relativePath = filePath;
+    const match = filePath.match(/^\/(?:workspace|local-folder)\/[^/]+\/(.+)$/);
+    if (match && match[1]) {
+      relativePath = match[1];
+    } else {
+      relativePath = filePath.split('/').pop() || filePath;
+    }
+
+    switch (ext) {
+      case 'html':
+        useEditorStore.getState().setSplitConfig({ enabled: true, direction: 'vertical' });
+        useUIStore.getState().addNotification({ type: 'success', message: 'Live Preview started' });
+        return; // Don't run a terminal command for HTML preview
+      case 'js':
+      case 'cjs':
+      case 'mjs':
+        command = `node "${relativePath}"`;
+        break;
+      case 'ts':
+        command = `npx ts-node "${relativePath}"`;
+        break;
+      case 'py':
+        command = `python "${relativePath}"`;
+        break;
+      case 'java':
+        command = `javac "${relativePath}" && java "${relativePath.replace(/\.java$/i, '')}"`;
+        break;
+      default:
+        command = `echo "No runner configured for ${relativePath}"`;
+    }
+
+    setActiveBottomPanel('terminal');
+    setBottomPanelVisible(true);
+    
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('ai-web-ide:terminal-command', { detail: { command } }));
+    }, 100);
+  }, [filePath, setActiveBottomPanel, setBottomPanelVisible]);
+
+  const isRunnable = ['javascript', 'typescript', 'python', 'java', 'html'].includes(language);
 
   return (
-    <div
-      className={`relative h-full w-full ${showEmptyEditorBackground ? 'empty-monaco-background' : ''}`}
-      style={showEmptyEditorBackground ? {
-        backgroundImage: `url("${EMPTY_EDITOR_BACKGROUND_IMAGE}")`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-      } : undefined}
-    >
+    <div className="relative h-full w-full group">
+      {isRunnable && (
+        <button
+          onClick={handleRunCurrentFile}
+          className="absolute top-4 right-6 z-10 flex items-center gap-1.5 rounded-md bg-[var(--bg-1)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-0)] shadow-lg hover:bg-[var(--bg-2)] border border-[var(--border-0)] transition-all"
+          title="Run this file"
+        >
+          <Play size={14} className="text-green-400" fill="currentColor" />
+          Run
+        </button>
+      )}
       <MonacoEditorReact
         height="100%"
+        path={fileUri}
         language={language}
         theme={monacoTheme}
         value={content}
@@ -821,13 +877,13 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
         occurrencesHighlight: 'multiFile',
         codeLens: settings.codeLens,
         lightbulb: { enabled: 'on' as 'on' },
-        padding: { top: 8, bottom: 8 },
+        padding: { top: 16, bottom: 16 },
         scrollbar: {
           vertical: 'auto',
           horizontal: 'auto',
           useShadows: false,
-          verticalScrollbarSize: 8,
-          horizontalScrollbarSize: 8,
+          verticalScrollbarSize: 10,
+          horizontalScrollbarSize: 10,
         },
         overviewRulerBorder: false,
         hideCursorInOverviewRuler: true,
@@ -836,10 +892,10 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
         lineNumbersMinChars: 4,
       }}
         loading={
-          <div className="w-full h-full flex items-center justify-center" style={{ background: '#1e1e1e' }}>
+          <div className="w-full h-full flex items-center justify-center bg-[var(--bg-0)]">
             <div className="flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs" style={{ color: '#858585' }}>Loading editor...</span>
+              <div className="w-6 h-6 border-2 border-[var(--text-3)] border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-[var(--text-3)]">Loading editor...</span>
             </div>
           </div>
         }
@@ -955,56 +1011,58 @@ function registerEditorThemes(monaco: typeof Monaco) {
     base: 'vs-dark',
     inherit: true,
     rules: [
-      { token: '', foreground: 'EEFFFF', fontStyle: '' },
-      { token: 'comment', foreground: '676E95', fontStyle: 'italic' },
-      { token: 'comment.doc', foreground: '676E95', fontStyle: 'italic' },
-      { token: 'keyword', foreground: 'C792EA' },
-      { token: 'keyword.control', foreground: 'C792EA' },
-      { token: 'keyword.operator', foreground: '89DDFF' },
-      { token: 'operator', foreground: '89DDFF' },
-      { token: 'string', foreground: 'C3E88D' },
-      { token: 'string.escape', foreground: 'C3E88D' },
-      { token: 'number', foreground: 'F78C6C' },
-      { token: 'regexp', foreground: 'F78C6C' },
-      { token: 'type', foreground: 'FFCB6B' },
-      { token: 'type.identifier', foreground: 'FFCB6B' },
-      { token: 'class', foreground: 'FFCB6B' },
-      { token: 'interface', foreground: 'FFCB6B' },
-      { token: 'identifier', foreground: 'EEFFFF' },
-      { token: 'variable', foreground: 'EEFFFF' },
-      { token: 'variable.predefined', foreground: '82AAFF' },
-      { token: 'variable.parameter', foreground: 'EEFFFF' },
-      { token: 'function', foreground: '82AAFF' },
-      { token: 'method', foreground: '82AAFF' },
-      { token: 'delimiter', foreground: '89DDFF' },
-      { token: 'tag', foreground: 'F07178' },
-      { token: 'attribute.name', foreground: 'C792EA' },
-      { token: 'attribute.value', foreground: 'C3E88D' },
-      { token: 'metatag', foreground: 'FF5370' },
-      { token: 'constant', foreground: 'F78C6C' },
-      { token: 'namespace', foreground: 'FFCB6B' },
+      { token: '', foreground: 'EDEDED', fontStyle: '' },
+      { token: 'comment', foreground: '666666', fontStyle: 'italic' },
+      { token: 'comment.doc', foreground: '666666', fontStyle: 'italic' },
+      { token: 'keyword', foreground: 'EDEDED', fontStyle: 'bold' },
+      { token: 'keyword.control', foreground: 'EDEDED', fontStyle: 'bold' },
+      { token: 'keyword.operator', foreground: 'EDEDED' },
+      { token: 'operator', foreground: 'EDEDED' },
+      { token: 'string', foreground: 'A5D6FF' },
+      { token: 'string.escape', foreground: '79C0FF' },
+      { token: 'number', foreground: '79C0FF' },
+      { token: 'regexp', foreground: 'A5D6FF' },
+      { token: 'type', foreground: 'D2A8FF' },
+      { token: 'type.identifier', foreground: 'D2A8FF' },
+      { token: 'class', foreground: 'D2A8FF' },
+      { token: 'interface', foreground: 'D2A8FF' },
+      { token: 'identifier', foreground: 'EDEDED' },
+      { token: 'variable', foreground: 'EDEDED' },
+      { token: 'variable.predefined', foreground: '79C0FF' },
+      { token: 'variable.parameter', foreground: 'EDEDED' },
+      { token: 'function', foreground: 'D2A8FF' },
+      { token: 'method', foreground: 'D2A8FF' },
+      { token: 'delimiter', foreground: '8B949E' },
+      { token: 'tag', foreground: '7EE787' },
+      { token: 'attribute.name', foreground: '79C0FF' },
+      { token: 'attribute.value', foreground: 'A5D6FF' },
+      { token: 'metatag', foreground: '8B949E' },
+      { token: 'constant', foreground: '79C0FF' },
+      { token: 'namespace', foreground: 'D2A8FF' },
     ],
     colors: {
-      'editor.background': '#090a0f',
-      'editor.foreground': '#eeffff',
-      'editorLineNumber.foreground': '#4b4b4b',
-      'editorLineNumber.activeForeground': '#c6c6c6',
-      'editorCursor.foreground': '#aeafad',
-      'editor.selectionBackground': '#3e4451',
-      'editor.inactiveSelectionBackground': '#3a3d41',
-      'editor.lineHighlightBackground': '#13151c',
-      'editor.lineHighlightBorder': '#13151c',
-      'editorIndentGuide.background1': '#2f2f2f',
-      'editorIndentGuide.activeBackground1': '#5a5a5a',
-      'editorSuggestWidget.background': '#090a0f',
-      'editorSuggestWidget.border': '#2d2d2d',
-      'editorSuggestWidget.foreground': '#d4d4d4',
-      'editorSuggestWidget.highlightForeground': '#82aaff',
-      'editorSuggestWidget.selectedBackground': '#2c313a',
-      'editorGhostText.foreground': '#6a737d',
-      'editorGhostText.background': '#090a0f',
-      'editorBracketMatch.background': '#3e4451',
-      'editorBracketMatch.border': '#89ddff',
+      'editor.background': '#000000',
+      'editor.foreground': '#EDEDED',
+      'editorLineNumber.foreground': '#333333',
+      'editorLineNumber.activeForeground': '#888888',
+      'editorCursor.foreground': '#FFFFFF',
+      'editor.selectionBackground': '#264F78',
+      'editor.inactiveSelectionBackground': '#3A3D41',
+      'editor.lineHighlightBackground': '#111111',
+      'editor.lineHighlightBorder': '#111111',
+      'editorIndentGuide.background1': '#222222',
+      'editorIndentGuide.activeBackground1': '#444444',
+      'editorSuggestWidget.background': '#09090B',
+      'editorSuggestWidget.border': '#222222',
+      'editorSuggestWidget.foreground': '#EDEDED',
+      'editorSuggestWidget.highlightForeground': '#D2A8FF',
+      'editorSuggestWidget.selectedBackground': '#222222',
+      'editorGhostText.foreground': '#666666',
+      'editorGhostText.background': '#000000',
+      'editorBracketMatch.background': '#222222',
+      'editorBracketMatch.border': '#444444',
+      'editorWidget.background': '#09090B',
+      'editorWidget.border': '#222222',
     },
   });
 
@@ -1118,8 +1176,11 @@ function registerInlineCompletionProvider(monaco: typeof Monaco) {
           return { items: [] };
         }
 
+        const prefixStartLine = Math.max(1, position.lineNumber - 50);
+        const suffixEndLine = Math.min(model.getLineCount(), position.lineNumber + 50);
+
         const prefix = model.getValueInRange({
-          startLineNumber: 1,
+          startLineNumber: prefixStartLine,
           startColumn: 1,
           endLineNumber: position.lineNumber,
           endColumn: position.column,
@@ -1127,8 +1188,8 @@ function registerInlineCompletionProvider(monaco: typeof Monaco) {
         const suffix = model.getValueInRange({
           startLineNumber: position.lineNumber,
           startColumn: position.column,
-          endLineNumber: model.getLineCount(),
-          endColumn: model.getLineContent(model.getLineCount()).length + 1,
+          endLineNumber: suffixEndLine,
+          endColumn: model.getLineContent(suffixEndLine).length + 1,
         });
 
         if (prefix.trim().length < 2) {
@@ -1228,25 +1289,7 @@ function registerSmartCompletionProviders(monaco: typeof Monaco) {
           model.getLanguageId(),
           range
         );
-        let aiSuggestions: Monaco.languages.CompletionItem[] = [];
-        if (useAIStore.getState().settings.inlineCompletionsEnabled) {
-          const prefixCode = model.getValueInRange({ startLineNumber: 1, startColumn: 1, endLineNumber: position.lineNumber, endColumn: position.column });
-          const suffixCode = model.getValueInRange({ startLineNumber: position.lineNumber, startColumn: position.column, endLineNumber: model.getLineCount(), endColumn: model.getLineMaxColumn(model.getLineCount()) });
-          try {
-            const aiItems = await fetchDropdownCompletion(prefixCode, suffixCode, model.getLanguageId(), { workspaceName: 'my-project' });
-            aiSuggestions = aiItems.map((item: any) => ({
-              label: item.label,
-              kind: monaco.languages.CompletionItemKind[item.kind as keyof typeof monaco.languages.CompletionItemKind] || monaco.languages.CompletionItemKind.Snippet,
-              insertText: item.insertText,
-              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              detail: item.detail ? `[AI] ${item.detail}` : '[AI] AI Suggestion',
-              range,
-              sortText: '0000_ai',
-            }));
-          } catch (e) {}
-        }
-
-        const suggestions = [...aiSuggestions, ...languageSuggestions, ...extensionSuggestions, ...documentSuggestions]
+        const suggestions = [...languageSuggestions, ...extensionSuggestions, ...documentSuggestions]
           .filter((suggestion) => {
             const label = String(suggestion.label).toLowerCase();
             return !prefix || label.includes(prefix);

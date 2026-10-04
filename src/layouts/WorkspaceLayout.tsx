@@ -46,13 +46,7 @@ export default function WorkspaceLayout() {
       window.history.replaceState({}, '', cleanUrl.pathname + (cleanUrl.search !== '?' ? cleanUrl.search : ''));
     }
 
-    workspaceService.getCurrentWorkspace()
-      .then((ws) => {
-        setWorkspace(ws, null);
-      })
-      .catch((err) => {
-        console.warn('Could not load current workspace:', err);
-      });
+    // Workspace is null by default. The user will be prompted to open a folder via the Welcome screen.
 
     const cleanupRuntime = initializeExtensionRuntime();
     terminalService.connect();
@@ -137,19 +131,23 @@ export default function WorkspaceLayout() {
       <TitleBar />
 
       {/* Main content area */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden bg-[var(--color-background)]">
         {/* Activity Bar */}
-        {activityBarVisible && <ActivityBar />}
+        {activityBarVisible && (
+          <div className="border-r border-[var(--border-1)] bg-[var(--color-activityBar)] h-full">
+            <ActivityBar />
+          </div>
+        )}
 
         {/* Sidebar */}
         {sidebarVisible && (
           <>
-            <div style={{ width: sidebarWidth, minWidth: 180, maxWidth: 400, flexShrink: 0, background: 'var(--color-sidebar)', borderRight: '1px solid var(--border-0)', overflow: 'hidden' }}>
+            <div style={{ width: sidebarWidth, minWidth: 180, maxWidth: 400, flexShrink: 0, background: 'var(--color-sidebar)', borderRight: '1px solid var(--border-1)', overflow: 'hidden' }}>
               <Sidebar />
             </div>
             {/* Sidebar resize handle */}
             <div
-              className={`resize-handle-v resize-handle${isDraggingSidebar ? ' dragging' : ''}`}
+              className={`resize-handle-v resize-handle${isDraggingSidebar ? ' dragging' : ''} -mx-1 z-10 w-2`}
               onMouseDown={handleSidebarMouseDown}
               aria-label="Resize sidebar"
               role="separator"
@@ -176,7 +174,7 @@ export default function WorkspaceLayout() {
           {/* Bottom panel resize handle */}
           {bottomPanelVisible && (
             <div
-              className={`resize-handle-h resize-handle${isDraggingBottom ? ' dragging' : ''}`}
+              className={`resize-handle-h resize-handle${isDraggingBottom ? ' dragging' : ''} -my-1 z-10 h-2`}
               onMouseDown={handleBottomMouseDown}
               aria-label="Resize bottom panel"
               role="separator"
@@ -185,7 +183,7 @@ export default function WorkspaceLayout() {
 
           {/* Bottom Panel */}
           {bottomPanelVisible && (
-            <div style={{ height: bottomPanelHeight, flexShrink: 0, background: 'var(--color-panel)', borderTop: '1px solid var(--border-0)', overflow: 'hidden' }}>
+            <div style={{ height: bottomPanelHeight, flexShrink: 0, background: 'var(--color-panel)', borderTop: '1px solid var(--border-1)', overflow: 'hidden' }}>
               <BottomPanel />
             </div>
           )}
@@ -195,12 +193,12 @@ export default function WorkspaceLayout() {
         {rightPanelVisible && (
           <>
             <div
-              className={`resize-handle-v resize-handle${isDraggingRight ? ' dragging' : ''}`}
+              className={`resize-handle-v resize-handle${isDraggingRight ? ' dragging' : ''} -mx-1 z-10 w-2`}
               onMouseDown={handleRightPanelMouseDown}
               aria-label="Resize AI panel"
               role="separator"
             />
-            <div style={{ width: rightPanelWidth, flexShrink: 0, background: 'var(--color-sidebar)', borderLeft: '1px solid var(--border-0)', overflow: 'hidden' }}>
+            <div style={{ width: rightPanelWidth, flexShrink: 0, background: 'var(--color-sidebar)', borderLeft: '1px solid var(--border-1)', overflow: 'hidden' }}>
               <AIChatPanel title="Anywhere AI" onClose={() => setRightPanelVisible(false)} />
             </div>
           </>
@@ -209,12 +207,12 @@ export default function WorkspaceLayout() {
         {/* AI Float Button (when panel is closed) */}
         {!rightPanelVisible && (
           <button
-            className="ai-float-btn"
+            className="ai-float-btn shadow-lg border border-[var(--border-2)]"
             title="Open Anywhere AI"
             aria-label="Open Anywhere AI"
             onClick={() => setRightPanelVisible(true)}
           >
-            <span className="ai-float-btn-icon">
+            <span className="ai-float-btn-icon shadow-sm">
               <Sparkles size={15} strokeWidth={2.2} />
             </span>
             <span

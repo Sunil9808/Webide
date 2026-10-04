@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import EditorTabs from './EditorTabs';
 import Breadcrumbs from './Breadcrumbs';
 import MonacoEditor from './MonacoEditor';
@@ -14,10 +14,13 @@ import { fileService } from '../../services/fileService';
 import { workspaceService } from '../../services/workspaceService';
 import { FileNode } from '../../types/file.types';
 import {
+  ArrowRight,
   Bot,
   Check,
+  Clock,
   Code2,
   FilePlus2,
+  Folder,
   FolderOpen,
   GitBranch,
   Lightbulb,
@@ -85,7 +88,6 @@ export default function Editor() {
     if (activeTab) {
       return (
         <MonacoEditor
-          key={activeTab.id}
           tabId={activeTab.id}
           filePath={activeTab.filePath}
           content={activeTab.content}
@@ -95,35 +97,7 @@ export default function Editor() {
       );
     }
 
-    return (
-      <div
-        className="h-full w-full"
-        style={{
-          backgroundImage: 'url("https://img.freepik.com/premium-photo/elegant-dark-background-designs_1199394-20502.jpg")',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          position: 'relative',
-        }}
-      >
-        {/* Subtle overlay */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            background: 'linear-gradient(135deg, rgba(10,14,20,0.55) 0%, rgba(0,0,0,0.3) 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            pointerEvents: 'none',
-          }}
-        >
-          <span style={{ color: 'rgba(255,255,255,0.18)', fontSize: 13, letterSpacing: '0.06em', fontFamily: 'Inter, sans-serif' }}>
-            Open a file to start editing
-          </span>
-        </div>
-      </div>
-    );
+    return <EmptyEditorWelcome />;
   };
 
   return (
@@ -145,7 +119,7 @@ export default function Editor() {
               }}
             >
               {activeTab?.language === 'html' ? (
-                <HtmlPreview content={activeTab.content} />
+                <HtmlPreview content={activeTab.content} filePath={activeTab.filePath} />
               ) : (
                 <div className="flex h-full items-center justify-center text-[13px]" style={{ color: 'var(--color-textMuted)' }}>
                   Split editor group
@@ -156,6 +130,184 @@ export default function Editor() {
         ) : (
           renderActiveEditor()
         )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyEditorWelcome() {
+  const openTab = useEditorStore((state) => state.openTab);
+  const closeAllTabs = useEditorStore((state) => state.closeAllTabs);
+  const addFile = useFileStore((state) => state.addFile);
+  const setFileTree = useFileStore((state) => state.setFileTree);
+  const setWorkspace = useWorkspaceStore((state) => state.setWorkspace);
+  const recentWorkspaces = useWorkspaceStore((state) => state.recentWorkspaces);
+  const { addNotification } = useUIStore();
+
+  const [recentProjects, setRecentProjects] = useState<Array<{ name: string; path: string; lastOpened?: number }>>([]);
+
+  useEffect(() => {
+    // Build recent projects from workspaceStore + hardcoded fallback
+    const projects: Array<{ name: string; path: string; lastOpened?: number }> = [];
+    
+    if (recentWorkspaces.length > 0) {
+      recentWorkspaces.forEach((ws) => {
+        projects.push({ name: ws.name, path: ws.path, lastOpened: ws.lastOpenedAt });
+      });
+    }
+
+    // Fallback recent items if store is empty
+    if (projects.length === 0) {
+      recentItems.forEach(([name, path]) => {
+        projects.push({ name, path });
+      });
+    }
+
+    setRecentProjects(projects.slice(0, 5));
+  }, [recentWorkspaces]);
+
+  const handleOpenFolder = () => {
+    window.dispatchEvent(new CustomEvent('ai-web-ide:open-folder', { detail: { mode: 'open' } }));
+  };
+
+  const handleNewFile = () => {
+    const fileName = window.prompt('File name', 'new-file.ts')?.trim();
+    if (!fileName) return;
+    const language = fileService.getLanguageFromExtension(fileName);
+    const path = `/workspace/${fileName}`;
+    const node: FileNode = {
+      id: `welcome-file-${Date.now()}`,
+      name: fileName,
+      path,
+      type: 'file',
+      extension: fileName.split('.').pop(),
+      language,
+      lastModified: Date.now(),
+    };
+    addFile(node);
+    openTab({
+      id: `tab-${node.id}`,
+      fileId: node.id,
+      filePath: path,
+      fileName,
+      language,
+      content: getDefaultContent(fileName, language),
+      isDirty: true,
+      isPreview: false,
+      cursorPosition: { line: 1, column: 1 },
+    });
+    addNotification({ type: 'success', message: `${fileName} created` });
+  };
+
+  const handleCloneRepo = () => {
+    const repositoryUrl = window.prompt('Repository URL to clone');
+    if (!repositoryUrl?.trim()) return;
+    const cleanUrl = repositoryUrl.trim();
+    const repoName = cleanUrl.split('/').pop()?.replace(/\.git$/, '') || 'cloned-repository';
+    window.dispatchEvent(new CustomEvent('ai-web-ide:create-cloned-workspace', {
+      detail: { repositoryUrl: cleanUrl, repoName },
+    }));
+  };
+
+  const handleOpenRecent = (name: string, path: string) => {
+    const readmePath = `${path.replace(/\\$/, '')}/${name}/README.md`.replace(/\\/g, '/');
+    const workspacePath = readmePath.replace('/README.md', '');
+    const tree = buildRecentWorkspaceTree(name, workspacePath);
+    closeAllTabs();
+    setWorkspace(createWorkspaceDescriptor(name, workspacePath));
+    setFileTree(tree);
+    openTab({
+      id: `tab-recent-${Date.now()}`,
+      fileId: tree[0].children?.[0].id || `recent-readme-${Date.now()}`,
+      filePath: readmePath,
+      fileName: 'README.md',
+      language: 'markdown',
+      content: `# ${name}\n\nRecent workspace opened from ${path}.\n`,
+      isDirty: false,
+      isPreview: false,
+      cursorPosition: { line: 1, column: 1 },
+    });
+    addNotification({ type: 'success', message: `Opened ${name}` });
+  };
+
+  return (
+    <div className="h-full w-full bg-[var(--bg-0)] flex items-center justify-center overflow-auto">
+      <div className="flex flex-col items-center w-full max-w-[460px] px-6 py-12 gap-10">
+        {/* Logo / Title */}
+        <div className="flex flex-col items-center gap-3">
+          <AppLogo className="h-10 w-10" />
+          <h1 className="text-[22px] font-semibold text-[var(--text-0)] tracking-tight">
+            AI Web IDE
+          </h1>
+          <p className="text-[13px] text-[var(--text-3)]">
+            Open a project to get started
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col w-full gap-2.5">
+          <button
+            onClick={handleOpenFolder}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-[var(--accent)] text-white text-[13px] font-medium hover:opacity-90 transition-opacity"
+          >
+            <FolderOpen size={18} />
+            Open Folder or Project
+            <ArrowRight size={14} className="ml-auto opacity-60" />
+          </button>
+
+          <button
+            onClick={handleNewFile}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-[var(--bg-1)] text-[var(--text-0)] text-[13px] font-medium border border-[var(--border-0)] hover:bg-[var(--bg-2)] transition-colors"
+          >
+            <FilePlus2 size={18} className="text-[var(--text-2)]" />
+            New File
+            <ArrowRight size={14} className="ml-auto opacity-40" />
+          </button>
+
+          <button
+            onClick={handleCloneRepo}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-lg bg-[var(--bg-1)] text-[var(--text-0)] text-[13px] font-medium border border-[var(--border-0)] hover:bg-[var(--bg-2)] transition-colors"
+          >
+            <GitBranch size={18} className="text-[var(--text-2)]" />
+            Clone Git Repository
+            <ArrowRight size={14} className="ml-auto opacity-40" />
+          </button>
+        </div>
+
+        {/* Recent Projects */}
+        {recentProjects.length > 0 && (
+          <div className="flex flex-col w-full gap-2">
+            <div className="flex items-center gap-2 px-1 mb-1">
+              <Clock size={14} className="text-[var(--text-3)]" />
+              <span className="text-[12px] font-medium text-[var(--text-3)] uppercase tracking-wider">
+                Recent Projects
+              </span>
+            </div>
+            {recentProjects.map((project, i) => (
+              <button
+                key={`${project.name}-${i}`}
+                onClick={() => handleOpenRecent(project.name, project.path)}
+                className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left hover:bg-[var(--bg-1)] transition-colors group"
+              >
+                <Folder size={16} className="text-[var(--text-3)] flex-shrink-0" />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <span className="text-[13px] font-medium text-[var(--text-1)] truncate group-hover:text-[var(--text-0)]">
+                    {project.name}
+                  </span>
+                  <span className="text-[11px] text-[var(--text-3)] truncate">
+                    {project.path}
+                  </span>
+                </div>
+                <ArrowRight size={14} className="text-[var(--text-3)] opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Keyboard shortcut hint */}
+        <p className="text-[11px] text-[var(--text-3)] opacity-60">
+          Tip: Press <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg-1)] border border-[var(--border-0)] text-[10px] font-mono">Ctrl+Shift+P</kbd> to open the Command Palette
+        </p>
       </div>
     </div>
   );

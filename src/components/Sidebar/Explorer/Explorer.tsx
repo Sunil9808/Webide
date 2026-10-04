@@ -394,112 +394,24 @@ function NoFolderOpened() {
     addNotification({ type: 'success', message: `Cloned ${repoName}` });
   };
 
-  const createJavaProject = () => {
-    const projectName = window.prompt('Java project name', 'java-project')?.trim() || 'java-project';
-    const basePath = `/java/${projectName}`;
-    const mainPath = `${basePath}/src/main/java/App.java`;
-    const tree: FileNode[] = [
-      {
-        id: `java-root-${Date.now()}`,
-        name: projectName,
-        path: basePath,
-        type: 'directory',
-        children: [
-          {
-            id: `java-src-${Date.now()}`,
-            name: 'src',
-            path: `${basePath}/src`,
-            type: 'directory',
-            children: [
-              {
-                id: `java-main-${Date.now()}`,
-                name: 'main',
-                path: `${basePath}/src/main`,
-                type: 'directory',
-                children: [
-                  {
-                    id: `java-folder-${Date.now()}`,
-                    name: 'java',
-                    path: `${basePath}/src/main/java`,
-                    type: 'directory',
-                    children: [
-                      {
-                        id: `java-app-${Date.now()}`,
-                        name: 'App.java',
-                        path: mainPath,
-                        type: 'file',
-                        extension: 'java',
-                        language: 'java',
-                      },
-                    ],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            id: `java-readme-${Date.now()}`,
-            name: 'README.md',
-            path: `${basePath}/README.md`,
-            type: 'file',
-            extension: 'md',
-            language: 'markdown',
-          },
-        ],
-      },
-    ];
 
-    createWorkspace(projectName, basePath, tree);
-    openTab({
-      id: `tab-java-app-${Date.now()}`,
-      fileId: `java-app-${Date.now()}`,
-      filePath: mainPath,
-      fileName: 'App.java',
-      language: 'java',
-      content: `public class App {\n    public static void main(String[] args) {\n        System.out.println("Hello from ${projectName}!");\n    }\n}\n`,
-      isDirty: false,
-      isPreview: false,
-      cursorPosition: { line: 1, column: 1 },
-    });
-    addNotification({ type: 'success', message: `Created ${projectName}` });
-  };
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="flex h-8 items-center gap-1 border-b px-2 text-[11px] font-semibold uppercase" style={{ borderColor: '#3794a6', color: '#d7d7d7' }}>
-        <ChevronDown size={19} strokeWidth={1.8} style={{ color: '#b9c6cf' }} />
+      <div className="flex h-8 items-center gap-1 px-1 mt-1 text-[11px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-1)' }}>
+        <ChevronDown size={16} strokeWidth={2} style={{ color: 'var(--text-1)' }} className="mr-0.5" />
         <span>No Folder Opened</span>
       </div>
 
-      <div className="px-5 pt-4 text-[13px] leading-[1.45]" style={{ color: '#dce2e8' }}>
-        <p>You have not yet opened a folder.</p>
+      <div className="px-5 pt-3 pb-6 text-[13px] leading-relaxed" style={{ color: 'var(--text-1)' }}>
+        <p className="mb-4">You have not yet opened a folder.</p>
 
         <ExplorerActionButton onClick={() => openFolder('open')}>Open Folder</ExplorerActionButton>
 
-        <p>
-          Opening a folder will close all currently open editors. To keep them open,{' '}
-          <TextLink onClick={() => openFolder('add')}>add a folder</TextLink> instead.
-        </p>
-
-        <p className="mt-6">You can clone a repository locally.</p>
+        <p className="mt-5 mb-4">You can clone a repository locally.</p>
 
         <ExplorerActionButton onClick={cloneRepository}>
           Clone Repository
-        </ExplorerActionButton>
-
-        <p>
-          To learn more about how to use Git and source control in VS Code{' '}
-          <TextLink onClick={openDocs}>
-            read our docs
-          </TextLink>.
-        </p>
-
-        <p className="mt-6">
-          You can also <TextLink onClick={() => openFolder('open')}>open a Java project folder</TextLink>, or create a new Java project by clicking the button below.
-        </p>
-
-        <ExplorerActionButton onClick={createJavaProject}>
-          Create Java Project
         </ExplorerActionButton>
       </div>
     </div>
@@ -509,8 +421,8 @@ function NoFolderOpened() {
 function ExplorerActionButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
-      className="my-4 h-[30px] w-full rounded-lg text-[13px] font-medium leading-none transition-all hover:brightness-110 hover:shadow-lg"
-      style={{ background: 'rgba(167,139,250,0.2)', color: 'var(--color-accent)', border: '1px solid rgba(167,139,250,0.3)' }}
+      className="w-full py-1.5 rounded-sm text-[13px] font-medium transition-opacity hover:opacity-90"
+      style={{ background: 'var(--accent)', color: '#ffffff' }}
       onClick={onClick}
     >
       {children}

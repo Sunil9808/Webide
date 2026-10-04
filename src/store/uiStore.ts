@@ -87,7 +87,7 @@ export const useUIStore = create<UIStore>((set) => ({
   sidebarWidth: 240,
   activeSidebarPanel: 'explorer',
   
-  bottomPanelVisible: true,
+  bottomPanelVisible: false,
   bottomPanelHeight: 280,
   activeBottomPanel: 'terminal',
   

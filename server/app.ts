@@ -39,6 +39,12 @@ app.use('/api/terminal', terminalRoutes);
 app.use('/api/project', projectRoutes);
 app.use('/api/sessions', sessionRoutes);
 
+import { getWorkspaceRoot } from './utils/workspaceRoot';
+// Serve workspace files statically for HTML/JS/CSS previews
+app.use('/preview', (req, res, next) => {
+  express.static(getWorkspaceRoot())(req, res, next);
+});
+
 // Serve frontend in production
 if (process.env.NODE_ENV === 'production') {
   const distPath = path.join(__dirname, '../../dist');

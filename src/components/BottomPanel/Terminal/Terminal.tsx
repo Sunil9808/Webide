@@ -139,6 +139,19 @@ export default function Terminal() {
   }, []);
 
   // Attach ResizeObserver to each terminal container element for automatic refitting
+  // Reset terminal sessions when switching to a different project workspace
+  useEffect(() => {
+    if (sessions.length > 0 && terminalCwd) {
+      const isDifferentWorkspace = sessions.some(s => s.cwd && !s.cwd.startsWith(terminalCwd) && !terminalCwd.startsWith(s.cwd));
+      if (isDifferentWorkspace) {
+        sessions.forEach(s => {
+          terminalService.destroySession(s.id);
+          removeSession(s.id);
+        });
+      }
+    }
+  }, [terminalCwd, sessions, removeSession]);
+
   useEffect(() => {
     const observers: Map<string, ResizeObserver> = new Map();
 
@@ -201,7 +214,7 @@ export default function Terminal() {
         cursorBlink: true,
         cursorStyle: 'bar',
         scrollback: 10000,
-        convertEol: true,
+        convertEol: false, // Fixed double newlines on Windows PTY
         allowProposedApi: true,
       });
 
@@ -550,7 +563,7 @@ export default function Terminal() {
             return (
               <button
                 key={session.id}
-                title={`${session.name} (${session.shell}) - ${session.status}`}
+                title={`Shell: ${session.name}\nPath: ${session.cwd}\nStatus: ${session.status}`}
                 className="group relative flex h-7 min-w-[110px] max-w-[170px] items-center gap-1.5 rounded-t px-2 text-left text-xs transition-colors"
                 style={{
                   background: active ? '#181818' : 'transparent',
@@ -573,7 +586,9 @@ export default function Terminal() {
                 <span className="font-mono text-[12px] font-bold" style={{ color: statusColor }}>
                   &gt;_
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12px] font-medium">{session.name}</span>
+                <span className="min-w-0 flex-1 truncate text-[12px] font-medium">
+                  {session.name} {session.cwd ? `- ${session.cwd.split(/[\\/]/).pop()}` : ''}
+                </span>
                 <span
                   className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                   style={{ background: statusColor }}

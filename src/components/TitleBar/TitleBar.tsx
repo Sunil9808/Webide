@@ -236,6 +236,24 @@ export default function TitleBar() {
         saveActiveFileAs();
       }
 
+      if (event.key.toLowerCase() === 'b' && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        setSidebarVisible(!useUIStore.getState().sidebarVisible);
+      }
+
+      if (event.key.toLowerCase() === 'j' && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        setBottomPanelVisible(!useUIStore.getState().bottomPanelVisible);
+      }
+
+      if (event.key.toLowerCase() === 'w' && !event.shiftKey && !event.altKey) {
+        event.preventDefault();
+        const activeTabId = useEditorStore.getState().activeTabId;
+        if (activeTabId) {
+          closeTab(activeTabId);
+        }
+      }
+
       if (event.key.toLowerCase() === 'p' && !event.shiftKey && !event.altKey) {
         event.preventDefault();
         toggleCommandPalette();
@@ -394,6 +412,32 @@ export default function TitleBar() {
   
   const triggerOpenFolder = async () => {
     try {
+      if ('showDirectoryPicker' in window) {
+        try {
+          // @ts-ignore
+          const dirHandle = await window.showDirectoryPicker();
+          closeAllTabs();
+          const ws = {
+            id: `local-${Date.now()}`,
+            name: dirHandle.name,
+            path: `/local-folder/${dirHandle.name}`,
+            type: 'local' as const,
+            createdAt: Date.now(),
+            lastOpenedAt: Date.now(),
+            recentFiles: [],
+            settings: { theme: 'dark', fontSize: 14, tabSize: 2, formatOnSave: true, aiEnabled: true, terminalShell: '/bin/bash' },
+          };
+          setWorkspace(ws, dirHandle);
+          notify(`Local folder opened: ${ws.name}`, 'success');
+          window.dispatchEvent(new CustomEvent('ai-web-ide:workspace-changed'));
+          window.dispatchEvent(new CustomEvent('ai-web-ide:refresh-explorer'));
+          return;
+        } catch (err: any) {
+          if (err.name !== 'AbortError') throw err;
+          return;
+        }
+      }
+
       notify('Opening folder picker...', 'info');
       const res = await fetch('/api/workspace/pick-folder');
       if (res.ok) {
@@ -996,7 +1040,7 @@ export default function TitleBar() {
               <div key={menu.label} className="relative">
                 <button
                   className="rounded px-2 py-1 text-[13px] leading-none transition-colors hover:bg-white/10"
-                  style={{ background: activeMenu === menu.label ? 'rgba(167,139,250,0.15)' : 'transparent', color: 'var(--color-text)' }}
+                  style={{ background: activeMenu === menu.label ? 'var(--color-selected)' : 'transparent', color: 'var(--color-text)' }}
                   onMouseEnter={() => activeMenu && setActiveMenu(menu.label)}
                   onClick={() => {
                     setActiveMenu(activeMenu === menu.label ? null : menu.label);
@@ -1045,22 +1089,22 @@ export default function TitleBar() {
           </div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center gap-3">
-          <button onClick={goBack} className="flex h-8 w-8 items-center justify-center rounded hover:bg-white/10" title="Go Back">
-            <ArrowLeft size={20} />
+        <div className="flex flex-1 items-center justify-center gap-2">
+          <button onClick={goBack} className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/10 transition-colors" title="Go Back">
+            <ArrowLeft size={16} />
           </button>
-          <button onClick={goForward} className="flex h-8 w-8 items-center justify-center rounded hover:bg-white/10" title="Go Forward">
-            <ArrowRight size={20} />
+          <button onClick={goForward} className="flex h-8 w-8 items-center justify-center rounded-md hover:bg-white/10 transition-colors" title="Go Forward">
+            <ArrowRight size={16} />
           </button>
           <button
             onClick={toggleCommandPalette}
-            className="flex h-[34px] w-[730px] max-w-[42vw] items-center rounded-lg border px-4 text-left text-[13px] hover:bg-white/[0.06] transition-colors"
-            style={{ background: 'rgba(167,139,250,0.07)', borderColor: 'rgba(167,139,250,0.2)', color: 'var(--color-textMuted)' }}
+            className="flex h-[32px] w-[600px] max-w-[40vw] items-center rounded-lg border px-4 text-left text-[13px] transition-all hover:bg-[var(--bg-2)] hover:border-[var(--border-2)]"
+            style={{ background: 'var(--bg-1)', borderColor: 'var(--border-1)', color: 'var(--text-1)' }}
             title="Search (Ctrl+Shift+P)"
           >
             <Search size={14} className="mr-2.5 opacity-60" />
             <span>Search files, commands…</span>
-            <span className="ml-auto text-[11px] opacity-50">Ctrl+P</span>
+            <span className="ml-auto text-[11px] opacity-50 bg-[var(--bg-2)] px-1.5 py-0.5 rounded border border-[var(--border-0)]">Ctrl+P</span>
           </button>
         </div>
 
@@ -1292,11 +1336,11 @@ function FileDropdown({
   return (
     <div
       className="absolute left-0 top-full z-50 rounded-xl py-2 text-[13px] shadow-2xl"
-      style={{ width, background: '#150f2a', border: '1px solid rgba(167,139,250,0.2)', color: 'var(--color-text)', boxShadow: '0 8px 32px rgba(0,0,0,0.6)' }}
+      style={{ width, background: 'var(--bg-1)', border: '1px solid var(--border-1)', color: 'var(--color-text)', boxShadow: 'var(--shadow-lg)' }}
     >
       {items.map((item) => {
         if (item.separator) {
-          return <div key={item.id} className="my-1 h-px" style={{ background: 'rgba(167,139,250,0.12)' }} />;
+          return <div key={item.id} className="my-1 h-px" style={{ background: 'var(--border-0)' }} />;
         }
 
         return (
@@ -1326,7 +1370,7 @@ function FileDropdown({
             {item.children && openSubmenu === item.id && (
               <div
                 className="absolute left-[calc(100%-4px)] top-0 z-50 rounded-xl py-2 text-[13px] shadow-2xl"
-                style={{ width: item.childWidth || 265, background: '#150f2a', border: '1px solid rgba(167,139,250,0.2)', color: 'var(--color-text)' }}
+                style={{ width: item.childWidth || 265, background: 'var(--bg-1)', border: '1px solid var(--border-1)', color: 'var(--color-text)', boxShadow: 'var(--shadow-lg)' }}
               >
                 {item.children.map((child) => (
                   <button
