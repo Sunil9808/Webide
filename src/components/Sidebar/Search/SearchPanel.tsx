@@ -145,43 +145,46 @@ export default function SearchPanel() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden" style={{ background: 'var(--color-sidebar)' }}>
-      <div className="flex h-9 items-center justify-between px-3 no-select">
-        <span className="text-[16px] font-normal uppercase leading-none" style={{ color: 'var(--color-text)' }}>
+      <div className="flex h-9 items-center justify-between px-4 no-select flex-shrink-0">
+        <span
+          className="text-[11px] font-semibold uppercase tracking-widest"
+          style={{ color: 'var(--color-textMuted)', letterSpacing: '0.08em' }}
+        >
           Search
         </span>
-        <div className="flex items-center gap-2" style={{ color: 'var(--color-textMuted)' }}>
+        <div className="flex items-center gap-1" style={{ color: 'var(--color-textMuted)' }}>
           <HeaderButton title="Refresh Search" onClick={refreshSearch}>
-            <RefreshCw size={19} strokeWidth={1.7} />
+            <RefreshCw size={14} />
           </HeaderButton>
           <HeaderButton title="Clear Search Results" onClick={clearSearch}>
-            <ListFilter size={20} strokeWidth={1.7} />
+            <ListFilter size={14} />
           </HeaderButton>
           <HeaderButton title="Open Search Editor" onClick={openSearchEditor}>
-            <Files size={20} strokeWidth={1.7} />
+            <Files size={14} />
           </HeaderButton>
           <HeaderButton title={resultsCollapsed ? 'Expand Search Results' : 'Collapse Search Results'} onClick={() => setResultsCollapsed((value) => !value)}>
-            <MoreHorizontal size={21} strokeWidth={1.7} />
+            <MoreHorizontal size={14} />
           </HeaderButton>
         </div>
       </div>
 
       <div className="px-3 pt-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <button
-            className="flex h-[38px] w-6 items-center justify-center rounded hover:bg-white/10"
+            className="flex h-6 w-5 items-center justify-center rounded hover:bg-white/10"
             style={{ color: 'var(--color-text)' }}
             title={replaceVisible ? 'Hide Replace' : 'Show Replace'}
             onClick={() => setReplaceVisible((value) => !value)}
           >
-            {replaceVisible ? <ChevronDown size={22} /> : <ChevronRight size={22} />}
+            {replaceVisible ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </button>
           <div
-            className="flex h-[38px] flex-1 items-center rounded-[5px] border"
-            style={{ background: '#111314', borderColor: invalidRegex ? '#f14c4c' : '#4b90a6' }}
+            className="flex h-6 flex-1 items-center rounded border"
+            style={{ background: 'var(--bg-0)', borderColor: invalidRegex ? '#f14c4c' : 'var(--border-1)' }}
           >
             <input
               ref={searchInputRef}
-              className="min-w-0 flex-1 bg-transparent px-2 text-[20px] outline-none placeholder:text-[#6f6f6f]"
+              className="min-w-0 flex-1 bg-transparent px-1.5 text-[13px] outline-none placeholder:text-[#6f6f6f]"
               style={{ color: 'var(--color-text)' }}
               placeholder="Search"
               value={query}
@@ -196,22 +199,22 @@ export default function SearchPanel() {
               Aa
             </InputToggle>
             <InputToggle active={wholeWord} title="Match Whole Word" onClick={() => setWholeWord((value) => !value)}>
-              <WholeWord size={25} strokeWidth={1.6} />
+              <span className="font-bold underline decoration-[1.5px] underline-offset-[2px]">ab</span>
             </InputToggle>
             <InputToggle active={useRegex} title="Use Regular Expression" onClick={() => setUseRegex((value) => !value)}>
-              <Regex size={22} strokeWidth={1.7} />
+              .*
             </InputToggle>
           </div>
         </div>
 
-        {replaceVisible && <div className="mt-2 flex items-center gap-2 pl-8">
+        {replaceVisible && <div className="mt-1.5 flex items-center gap-1 pl-6">
           <div
-            className="flex h-[35px] flex-1 items-center rounded-[5px] border"
-            style={{ background: '#151718', borderColor: '#34383b' }}
+            className="flex h-6 flex-1 items-center rounded border"
+            style={{ background: 'var(--bg-0)', borderColor: 'var(--border-1)' }}
           >
             <input
               ref={replaceInputRef}
-              className="min-w-0 flex-1 bg-transparent px-2 text-[20px] outline-none placeholder:text-[#686868]"
+              className="min-w-0 flex-1 bg-transparent px-1.5 text-[13px] outline-none placeholder:text-[#6f6f6f]"
               style={{ color: 'var(--color-text)' }}
               placeholder="Replace"
               value={replaceQuery}
@@ -225,41 +228,40 @@ export default function SearchPanel() {
             </InputToggle>
           </div>
           <button
-            className="flex h-[35px] w-[35px] items-center justify-center rounded transition-colors hover:bg-white/10"
+            className="flex h-6 w-6 items-center justify-center rounded transition-colors hover:bg-white/10"
             style={{ color: 'var(--color-textMuted)' }}
             title="Replace All"
             onClick={replaceAll}
           >
-            <Replace size={24} strokeWidth={1.7} />
+            <Replace size={14} />
           </button>
         </div>}
 
         <div className="mt-1 flex justify-end">
           <HeaderButton title="More Search Actions" onClick={() => setShowMoreActions((value) => !value)}>
-            <MoreHorizontal size={22} strokeWidth={1.7} />
+            <MoreHorizontal size={14} />
           </HeaderButton>
         </div>
 
         {showMoreActions && (
-          <div className="mb-1 ml-8 rounded border p-2 text-[13px]" style={{ borderColor: '#34383b', color: 'var(--color-textMuted)' }}>
+          <div className="mb-2 ml-6 rounded border p-2 text-[12px]" style={{ borderColor: 'var(--border-1)', color: 'var(--color-textMuted)' }}>
             Searching open editor tabs. Open a folder to search project files as they are opened.
           </div>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto px-3 pt-3">
+      <div className="flex-1 overflow-y-auto px-4 pt-1">
         {!workspace && !query && (
-          <div className="text-[20px] leading-[1.35]" style={{ color: '#aeb4b8' }}>
-            <p>You have not opened or specified a folder.</p>
-            <p>Only open files are currently searched -</p>
-            <button className="text-left text-[20px]" style={{ color: '#35b5ee' }} onClick={openFolder}>
+          <div className="text-[13px] leading-[1.4]" style={{ color: 'var(--color-textMuted)' }}>
+            <p>You have not opened or specified a folder. Only open files are currently searched.</p>
+            <button className="mt-2 text-blue-400 hover:underline" onClick={openFolder}>
               Open Folder
             </button>
           </div>
         )}
 
         {invalidRegex && (
-          <p className="mt-5 text-[16px]" style={{ color: '#f14c4c' }}>
+          <p className="mt-3 text-[13px]" style={{ color: '#f14c4c' }}>
             Invalid regular expression.
           </p>
         )}
@@ -312,8 +314,8 @@ function InputToggle({ active, children, title, onClick }: { active: boolean; ch
   return (
     <button
       title={title}
-      className="flex h-full min-w-[34px] items-center justify-center px-1 text-[16px] transition-colors hover:bg-white/10"
-      style={{ color: active ? '#ffffff' : '#c7c7c7', background: active ? 'rgba(255,255,255,0.12)' : 'transparent' }}
+      className="flex h-5 min-w-[20px] items-center justify-center px-1 text-[13px] rounded-sm transition-colors hover:bg-white/10 mx-0.5"
+      style={{ color: active ? 'var(--color-text)' : 'var(--color-textMuted)', background: active ? 'var(--bg-2)' : 'transparent' }}
       onClick={onClick}
     >
       {children}

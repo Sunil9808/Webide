@@ -224,20 +224,18 @@ function NoFolderView({
   onOpenDocs: () => void;
 }) {
   return (
-    <div className="mx-px flex-1 overflow-y-auto border p-[24px]" style={{ borderColor: '#3794a6' }}>
-      <div className="text-[20px] leading-[1.35]" style={{ color: '#dce2e8' }}>
-        <p>
-          In order to use Git features, you can open a folder containing a Git repository or clone from a URL.
-        </p>
+    <div className="flex-1 overflow-y-auto p-4 text-[13px]" style={{ color: 'var(--color-textMuted)' }}>
+      <p className="mb-4">
+        In order to use Git features, you can open a folder containing a Git repository or clone from a URL.
+      </p>
 
-        <PanelButton onClick={onOpenFolder}>Open Folder</PanelButton>
-        <PanelButton onClick={onCloneRepository}>Clone Repository</PanelButton>
+      <PanelButton onClick={onOpenFolder}>Open Folder</PanelButton>
+      <PanelButton onClick={onCloneRepository}>Clone Repository</PanelButton>
 
-        <p>
-          To learn more about how to use Git and source control in VS Code{' '}
-          <TextLink onClick={onOpenDocs}>read our docs</TextLink>.
-        </p>
-      </div>
+      <p className="mt-4">
+        To learn more about how to use Git and source control in VS Code{' '}
+        <TextLink onClick={onOpenDocs}>read our docs</TextLink>.
+      </p>
     </div>
   );
 }
@@ -252,28 +250,25 @@ function NoRepositoryView({
   onPublish: () => void;
 }) {
   return (
-    <div className="mx-px flex-1 overflow-y-auto border p-[30px]" style={{ borderColor: '#3794a6' }}>
-      <div className="text-[20px] leading-[1.35]" style={{ color: '#dce2e8' }}>
-        <p>
-          The folder currently open doesn't have a Git repository. You can initialize a repository which will enable source control features powered by Git.
-        </p>
+    <div className="flex-1 overflow-y-auto p-4 text-[13px]" style={{ color: 'var(--color-textMuted)' }}>
+      <p className="mb-4">
+        The folder currently open doesn't have a Git repository. You can initialize a repository which will enable source control features powered by Git.
+      </p>
 
-        <PanelButton onClick={onInitialize}>Initialize Repository</PanelButton>
+      <PanelButton onClick={onInitialize}>Initialize Repository</PanelButton>
 
-        <p>
-          To learn more about how to use Git and source control in VS Code{' '}
-          <TextLink onClick={onOpenDocs}>read our docs</TextLink>.
-        </p>
+      <p className="mt-4 mb-6">
+        To learn more about how to use Git and source control in VS Code{' '}
+        <TextLink onClick={onOpenDocs}>read our docs</TextLink>.
+      </p>
 
-        <p className="mt-6">
-          You can directly publish this folder to a GitHub repository. Once published, you'll have access to source control features powered by Git and GitHub.
-        </p>
+      <p className="mb-4">
+        You can directly publish this folder to a GitHub repository. Once published, you'll have access to source control features powered by Git and GitHub.
+      </p>
 
-        <PanelButton onClick={onPublish}>
-          <Github size={24} fill="currentColor" />
-          Publish to GitHub
-        </PanelButton>
-      </div>
+      <PanelButton onClick={onPublish}>
+        Publish to GitHub
+      </PanelButton>
     </div>
   );
 }
@@ -341,8 +336,7 @@ function EmptyLine({ children }: { children: React.ReactNode }) {
 function PanelButton({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
     <button
-      className="my-5 flex h-[38px] w-full items-center justify-center gap-2 rounded-md text-[18px] leading-none transition-colors hover:brightness-110"
-      style={{ background: '#2f86ad', color: '#ffffff' }}
+      className="mb-2 flex w-full items-center justify-center gap-1.5 rounded bg-[var(--button-primary)] py-1.5 text-[13px] text-white transition-opacity hover:opacity-90"
       onClick={onClick}
     >
       {children}
@@ -352,7 +346,7 @@ function PanelButton({ children, onClick }: { children: React.ReactNode; onClick
 
 function TextLink({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <button className="inline text-left align-baseline" style={{ color: '#35b5ee' }} onClick={onClick}>
+    <button className="inline text-left align-baseline text-blue-400 hover:underline" onClick={onClick}>
       {children}
     </button>
   );
