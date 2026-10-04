@@ -22,6 +22,7 @@ router.get('/health', aiController.health);
 router.post('/chat', aiController.chat);
 router.post('/complete', aiController.complete);
 router.post('/agent', aiController.agent);
+router.post('/agent/stream', aiController.agentStream);
 router.post('/explain', aiController.explain);
 router.post('/generate', aiController.generate);
 router.post('/debug', aiController.debug);

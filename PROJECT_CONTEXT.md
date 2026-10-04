@@ -69,7 +69,7 @@ An autonomous pair-programming agent and chat assistant orchestrate multi-provid
 4. **API Request**: The client sends a POST request to `/api/ai/chat` (or `/api/ai/agent/stream` for agent tasks) with `{ prompt, context, model, provider, profile, sessionId, conversationHistory }`.
 5. **NLU Preprocessing**: In `server/controllers/aiController.ts`, `processNLU` in `server/services/ai/nluService.ts` cleans the prompt, corrects typos, infers intent, and checks for destructive operations. The NLU outcome is attached to `context.nluResult`.
 6. **AI Service Facade**: `aiController` passes the request to `streamChatResponse` in `server/services/ai/aiService.ts`. System instructions are generated via `buildSystemPrompt` combining workspace context, active file content, and intent analysis.
-7. **Adapter Invocation**: The adapter is obtained via `adapterRegistry.getAdapter(provider)`. Note that in `aiService.ts`, the provider currently defaults to `getAIProvider()` (`process.env.AI_PROVIDER`).
+7. **Adapter Invocation**: The adapter is obtained via `adapterRegistry.getAdapter(provider)`. In `aiService.ts`, `streamChatResponse` honors the frontend-supplied `options.provider` and falls back to `getAIProvider()` (`process.env.AI_PROVIDER`) only when omitted.
 8. **Model Provider Communication**: The resolved adapter (`OpenAIAdapter`, `GeminiAdapter`, or `OllamaAdapter`) calls the external LLM API via streaming (OpenAI Chat Completions SSE, Gemini `generateContentStream`, or Ollama `/api/chat` stream).
 9. **SSE Server Streaming**: Tokens are streamed back to Express response as Server-Sent Events (`data: {"choices":[{"delta":{"content":"..."}}]}`).
 10. **Client Consumption**: `useAIChat.ts` consumes the stream via `TextDecoder` and `ReadableStreamDefaultReader`, updating `aiStore.appendToLastMessage` on each chunk. Monaco and React components re-render in real time until `[DONE]` or stream finalization.
@@ -79,7 +79,7 @@ An autonomous pair-programming agent and chat assistant orchestrate multi-provid
 2. **Dynamic Aggregation**: `server/controllers/aiController.ts` delegates to `adapterRegistry.getAllModels()`, which invokes `getModels()` across all registered adapters concurrently and deduplicates results.
 3. **UI Selection**: Selecting a model in `ModelSelector.tsx` updates `selectedModel` in `aiStore.ts`.
 4. **Transmission**: `useAIChat.ts` looks up the selected model in `availableModels`, extracting both `model` ID and `provider` ID, and sends them in the request body to `/api/ai/chat`.
-5. **Backend Dispatch**: `openaiAdapter.ts` contains `resolveModelName()`, passing namespaced models (such as `nvidia/nemotron-3.5-lightning-30b-a3b` or `meta/llama-3.2-11b-vision-instruct`) directly to NVIDIA NIM / OpenAI endpoints, with fallback handling for unconfigured IDs.
+5. **Backend Dispatch**: `aiService.ts` respects the requested provider (`options.provider`), routing models like `deepseek-ai/deepseek-v4.1-flash` to `OpenAIAdapter`. In `openaiAdapter.ts`, `getClient()` dynamically detects NVIDIA NIM models and looks for `NVIDIA_API_KEY` (or `OPENAI_API_KEY`) pointing to `https://integrate.api.nvidia.com/v1`, reporting clear provider-specific errors if unconfigured.
 
 ## 5. Module Ownership Table
 | Module | Key Files | Owner |
@@ -115,9 +115,9 @@ An autonomous pair-programming agent and chat assistant orchestrate multi-provid
   - Frontend: Global store error capturing (`setError`) paired with user-facing notification toasts and inline retry buttons (`useAIChat.ts`).
 
 ## 7. Known Issues
-- **Models ignore project context** [verified]:
+- **Models ignore project context** [partially resolved / verified]:
   - *References*: `server/services/ai/aiService.ts:41-44`, `server/services/ai/aiService.ts:80`, `server/services/ai/aiService.ts:95-98`, `src/hooks/useAIChat.ts:21-34`
-  - *Details*: `buildContext` in `useAIChat.ts` does not include open files or file tree context in standard chat requests. Furthermore, `aiService.ts:41-44` and `aiService.ts:80` contain explicit prompt directives instructing models to answer general programming questions generally and NOT force answers into active files. In addition, `aiService.ts:97` ignores the frontend-provided provider and hardcodes fallback to `process.env.AI_PROVIDER`.
+  - *Details*: `buildContext` in `useAIChat.ts` does not include open files or file tree context in standard chat requests. Furthermore, `aiService.ts:41-44` and `aiService.ts:80` contain explicit prompt directives instructing models to answer general programming questions generally and NOT force answers into active files. (Note: The provider override bug in `aiService.ts:97` that forced all requests to `process.env.AI_PROVIDER` has been resolved; `options.provider` is now honored with fallback to `getAIProvider()`).
 - **Wrong code for simple algorithm requests** [verified]:
   - *References*: `server/services/ai/nluService.ts:292-300`, `server/services/ai/aiService.ts:43`, `server/services/ai/agentService.ts:1028-1031`
   - *Details*: Models frequently generate non-machine-learning code (such as linear search or decision trees) or incorrect languages for simple algorithm requests. Hardcoded regex overrides and prompt patches were added specifically for Find-S, PCA, SVM, and KNN to force Python and Tom Mitchell's algorithm.
@@ -141,3 +141,4 @@ An autonomous pair-programming agent and chat assistant orchestrate multi-provid
 ## 9. Feature Log
 | Date | Feature | Files changed | Notes |
 |---|---|---|---|
+| 2026-10-04 | Fix deepseek model provider routing & NIM key error | server/services/ai/aiService.ts, server/services/ai/adapters/openaiAdapter.ts, server/controllers/aiController.ts, .env.example | Honored frontend options.provider in streamChatResponse with getAIProvider() fallback; added NVIDIA NIM apiKey/baseURL detection and provider-specific missing key errors. |

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { streamChatResponse, getChatCompletion, getInlineCompletion, AIContext } from '../services/ai/aiService';
-import { runPairProgrammerAgent, autoDetectAndRecommendExtensions } from '../services/ai/agentService';
+import { runPairProgrammerAgent, runStreamingPairProgrammerAgent, autoDetectAndRecommendExtensions } from '../services/ai/agentService';
 import { processNLU, ConversationEntry } from '../services/ai/nluService';
 import { adapterRegistry } from '../services/ai/adapterRegistry';
 
