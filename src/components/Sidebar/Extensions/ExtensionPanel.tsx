@@ -183,11 +183,34 @@ export default function ExtensionPanel() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`https://open-vsx.org/api/-/search?query=${encodeURIComponent(searchText)}&size=30`);
+      const body = {
+        filters: [{
+          criteria: [
+            { filterType: 10, value: searchText },
+            { filterType: 8, value: "Microsoft.VisualStudio.Code" }
+          ],
+          pageNumber: 1,
+          pageSize: 30,
+          sortBy: 0,
+          sortOrder: 0
+        }],
+        assetTypes: ["Microsoft.VisualStudio.Services.Icons.Default"],
+        flags: 914
+      };
+      const response = await fetch('https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json;api-version=3.0-preview.1'
+        },
+        body: JSON.stringify(body)
+      });
       if (!response.ok) throw new Error(`Marketplace returned ${response.status}`);
-      const data = await response.json() as { extensions?: OpenVsxExtension[] };
-      setMarketplace((data.extensions || []).map(fromOpenVsx).filter(Boolean) as ExtensionItem[]);
-    } catch {
+      const data = await response.json();
+      const results = data.results?.[0]?.extensions || [];
+      setMarketplace(results.map(fromVSCodeMarketplace).filter(Boolean) as ExtensionItem[]);
+    } catch (e) {
+      console.error(e);
       setError('Marketplace unavailable. Showing cached recommendations.');
       setMarketplace([]);
     } finally {
@@ -670,6 +693,36 @@ function EmptySection({ children }: { children: React.ReactNode }) {
   );
 }
 
+export function fromVSCodeMarketplace(ext: any): ExtensionItem | null {
+  if (!ext || !ext.publisher || !ext.extensionName) return null;
+  const publisherName = ext.publisher.publisherName;
+  const name = ext.extensionName;
+  const id = `${publisherName}.${name}`;
+  const versionInfo = ext.versions?.[0] || { files: [] };
+  
+  const getAsset = (type: string) => versionInfo.files.find((f: any) => f.assetType === type)?.source;
+  const iconUrl = getAsset('Microsoft.VisualStudio.Services.Icons.Default');
+  const packageUrl = getAsset('Microsoft.VisualStudio.Services.VSIXPackage') || `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${publisherName}/vsextensions/${name}/${versionInfo.version}/vspackage`;
+  
+  const getStat = (statName: string) => ext.statistics?.find((s: any) => s.statisticName === statName)?.value || 0;
+  
+  return {
+    id,
+    name,
+    displayName: ext.displayName || name,
+    publisher: ext.publisher.displayName || publisherName,
+    version: versionInfo.version || 'latest',
+    description: ext.shortDescription || 'VS Code extension.',
+    downloads: getStat('install'),
+    rating: getStat('averagerating'),
+    iconUrl,
+    packageUrl,
+    verified: true,
+    source: 'VS Code Marketplace',
+    capabilities: [...(ext.categories || []), ...(ext.tags || [])]
+  };
+}
+
 function ToolbarButton({ children, title, onClick }: { children: React.ReactNode; title: string; onClick: () => void }) {
   return (
     <button
@@ -699,44 +752,27 @@ function getQueryForTab(tab: MarketplaceTab): string {
   return queries[tab];
 }
 
-interface OpenVsxExtension {
-  namespace?: string;
-  name?: string;
-  displayName?: string;
-  description?: string;
-  version?: string;
-  downloadCount?: number;
-  averageRating?: number;
-  homepage?: string;
-  files?: { icon?: string };
-}
-
-function fromOpenVsx(item: OpenVsxExtension): ExtensionItem | null {
-  if (!item.namespace || !item.name) return null;
-  return {
-    id: `${item.namespace}.${item.name}`,
-    name: item.name,
-    displayName: item.displayName || item.name,
-    publisher: item.namespace,
-    version: item.version || 'latest',
-    description: item.description || 'VS Code-compatible extension.',
-    downloads: item.downloadCount,
-    rating: item.averageRating,
-    iconUrl: normalizeIconUrl(item.files?.icon),
-    verified: true,
-    homepage: item.homepage,
-  };
-}
-
 async function fetchExtensionDetails(extensionId: string): Promise<ExtensionItem | null> {
-  const [namespace, ...nameParts] = extensionId.split('.');
-  const name = nameParts.join('.');
-  if (!namespace || !name) return null;
   try {
-    const response = await fetch(`https://open-vsx.org/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`);
+    const body = {
+      filters: [{
+        criteria: [{ filterType: 7, value: extensionId }],
+        pageNumber: 1,
+        pageSize: 1
+      }],
+      assetTypes: ["Microsoft.VisualStudio.Services.Icons.Default"],
+      flags: 914
+    };
+    const response = await fetch('https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json;api-version=3.0-preview.1' },
+      body: JSON.stringify(body)
+    });
     if (!response.ok) return null;
-    const data = await response.json() as OpenVsxExtension;
-    return fromOpenVsx({ ...data, namespace: data.namespace || namespace, name: data.name || name });
+    const data = await response.json();
+    const ext = data.results?.[0]?.extensions?.[0];
+    if (!ext) return null;
+    return fromVSCodeMarketplace(ext);
   } catch {
     return null;
   }

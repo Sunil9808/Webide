@@ -265,34 +265,56 @@ async function buildInternetInstall(item: ExtensionItem) {
   const name = nameParts.join('.');
   if (!namespace || !name) return activateExtension(item, 'Local');
 
-  const response = await fetch(`https://open-vsx.org/api/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`);
-  if (!response.ok) throw new Error(`Open VSX returned ${response.status}`);
+  const body = {
+    filters: [{
+      criteria: [{ filterType: 7, value: `${namespace}.${name}` }],
+      pageNumber: 1,
+      pageSize: 1
+    }],
+    assetTypes: ["Microsoft.VisualStudio.Services.Icons.Default", "Microsoft.VisualStudio.Services.VSIXPackage"],
+    flags: 914
+  };
+  const response = await fetch('https://marketplace.visualstudio.com/_apis/public/gallery/extensionquery', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json;api-version=3.0-preview.1' },
+    body: JSON.stringify(body)
+  });
+  
+  if (!response.ok) throw new Error(`Marketplace returned ${response.status}`);
+  const data = await response.json();
+  const ext = data.results?.[0]?.extensions?.[0];
+  
+  if (!ext) {
+    // Fallback if not found online
+    return activateExtension(item, 'Local');
+  }
 
-  const data = await response.json() as OpenVsxDetail;
-  const packageUrl = normalizeRemoteUrl(data.files?.download);
+  const versionInfo = ext.versions?.[0] || { files: [] };
+  const getAsset = (type: string) => versionInfo.files.find((f: any) => f.assetType === type)?.source;
+  const packageUrl = getAsset('Microsoft.VisualStudio.Services.VSIXPackage') || `https://marketplace.visualstudio.com/_apis/public/gallery/publishers/${ext.publisher.publisherName}/vsextensions/${ext.extensionName}/${versionInfo.version}/vspackage`;
+  
+  const getStat = (statName: string) => ext.statistics?.find((s: any) => s.statisticName === statName)?.value || 0;
+
   const installed = activateExtension({
     ...item,
-    id: `${data.namespace || namespace}.${data.name || name}`,
-    name: data.name || name,
-    displayName: data.displayName || item.displayName,
-    publisher: data.namespace || item.publisher,
-    version: data.version || item.version,
-    description: data.description || item.description,
-    downloads: data.downloadCount ?? item.downloads,
-    rating: data.averageRating ?? item.rating,
-    iconUrl: normalizeRemoteUrl(data.files?.icon) || item.iconUrl,
-    homepage: data.homepage || data.repository || item.homepage,
+    id: `${ext.publisher.publisherName}.${ext.extensionName}`,
+    name: ext.extensionName,
+    displayName: ext.displayName || item.displayName,
+    publisher: ext.publisher.displayName || ext.publisher.publisherName,
+    version: versionInfo.version || item.version,
+    description: ext.shortDescription || item.description,
+    downloads: getStat('install') || item.downloads,
+    rating: getStat('averagerating') || item.rating,
+    iconUrl: getAsset('Microsoft.VisualStudio.Services.Icons.Default') || item.iconUrl,
     packageUrl,
-    readmeUrl: normalizeRemoteUrl(data.files?.readme),
-    changelogUrl: normalizeRemoteUrl(data.files?.changelog),
     verified: true,
-    source: 'Open VSX',
+    source: 'VS Code Marketplace',
     capabilities: uniqueList([
-      ...(data.categories || []),
-      ...(data.tags || []),
+      ...(ext.categories || []),
+      ...(ext.tags || []),
       ...getExtensionCapabilities(item),
     ]),
-  }, 'Open VSX');
+  }, 'VS Code Marketplace');
 
   installed.cachedPackage = packageUrl ? await cacheExtensionPackage(installed.id, packageUrl) : false;
   return installed;
