@@ -411,51 +411,11 @@ export default function TitleBar() {
   const triggerOpenFile = () => openFileInputRef.current?.click();
   
   const triggerOpenFolder = async () => {
-    try {
-      if ('showDirectoryPicker' in window) {
-        try {
-          // @ts-ignore
-          const dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-          closeAllTabs();
-          const ws = {
-            id: `local-${Date.now()}`,
-            name: dirHandle.name,
-            path: `/local-folder/${dirHandle.name}`,
-            type: 'local' as const,
-            createdAt: Date.now(),
-            lastOpenedAt: Date.now(),
-            recentFiles: [],
-            settings: { theme: 'dark', fontSize: 14, tabSize: 2, formatOnSave: true, aiEnabled: true, terminalShell: '/bin/bash' },
-          };
-          setWorkspace(ws, dirHandle);
-          notify(`Local folder opened: ${ws.name}`, 'success');
-          window.dispatchEvent(new CustomEvent('ai-web-ide:workspace-changed'));
-          window.dispatchEvent(new CustomEvent('ai-web-ide:refresh-explorer'));
-          return;
-        } catch (err: any) {
-          if (err.name !== 'AbortError') throw err;
-          return;
-        }
-      }
-
-      notify('Opening folder picker...', 'info');
-      const res = await fetch('/api/workspace/pick-folder');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.path) {
-          closeAllTabs();
-          const ws = await workspaceService.openWorkspace(data.path);
-          setWorkspace(ws, null);
-          notify(`Workspace opened: ${ws.name}`, 'success');
-          window.dispatchEvent(new CustomEvent('ai-web-ide:workspace-changed'));
-          window.dispatchEvent(new CustomEvent('ai-web-ide:refresh-explorer'));
-          return;
-        } else if (data.canceled) {
-          return;
-        }
-      }
-    } catch {}
-
+    // We intentionally bypass showDirectoryPicker here because local browser OPFS handles 
+    // cannot be accessed by the backend terminal. To allow commands like `npm run dev` 
+    // to work in the selected folder, we must use the backend File Browser Modal which 
+    // returns a physical absolute path to the backend workspace service.
+    
     // Fallback: show local file browser modal
     setShowFileBrowserModal(true);
   };

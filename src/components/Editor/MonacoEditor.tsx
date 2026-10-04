@@ -713,13 +713,17 @@ export default function MonacoEditor({ tabId, filePath, content, language, onCon
     let command = '';
     const ext = filePath.split('.').pop()?.toLowerCase();
     
-    // Extract relative path (e.g., 'src/utils/math.ts' from '/workspace/my-project/src/utils/math.ts')
     let relativePath = filePath;
-    const match = filePath.match(/^\/(?:workspace|local-folder)\/[^/]+\/(.+)$/);
-    if (match && match[1]) {
-      relativePath = match[1];
+    const wp = useWorkspaceStore.getState().workspace?.path;
+    if (wp && filePath.startsWith(wp)) {
+      relativePath = filePath.substring(wp.length).replace(/^[/\\]+/, '');
     } else {
-      relativePath = filePath.split('/').pop() || filePath;
+      const match = filePath.match(/^\/(?:workspace|local-folder)\/[^/]+\/(.+)$/);
+      if (match && match[1]) {
+        relativePath = match[1];
+      } else {
+        relativePath = filePath.split(/[/\\]/).pop() || filePath;
+      }
     }
 
     switch (ext) {

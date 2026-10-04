@@ -123,13 +123,19 @@ class TerminalManager {
     }
 
     try {
-      return resolveWorkspacePath(requestedCwd);
-    } catch {
-      if (fs.existsSync(requestedCwd) && fs.statSync(requestedCwd).isDirectory()) {
-        return path.resolve(requestedCwd);
+      const resolved = resolveWorkspacePath(requestedCwd);
+      if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+        return resolved;
       }
-      return defaultRoot;
+    } catch {
+      // ignore
     }
+
+    if (fs.existsSync(requestedCwd) && fs.statSync(requestedCwd).isDirectory()) {
+      return path.resolve(requestedCwd);
+    }
+    
+    return defaultRoot;
   }
 
   public createSession(options: CreateTerminalOptions): PTYSessionInfo {
@@ -166,7 +172,15 @@ class TerminalManager {
     }
 
     const resolvedShell = this.resolveShell(shell);
-    const workDir = this.resolveDirectory(cwd);
+    let workDir = this.resolveDirectory(cwd);
+    
+    // CRITICAL FIX: Ensure workDir physically exists to prevent Windows CreateProcess failed
+    if (!fs.existsSync(workDir)) {
+      workDir = getWorkspaceRoot();
+      if (!fs.existsSync(workDir)) {
+        workDir = os.homedir();
+      }
+    }
 
     let ptyProcess: any;
     try {

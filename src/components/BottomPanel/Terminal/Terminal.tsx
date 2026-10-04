@@ -364,18 +364,32 @@ export default function Terminal() {
         return;
       }
 
-      if (detail?.command && activeSessionId) {
-        terminalService.sendData(activeSessionId, `${detail.command}\r`);
-        const instance = xtermInstancesRef.current.get(activeSessionId);
-        if (instance) {
-          instance.xterm.focus();
-        }
+      let targetSessionId = activeSessionId;
+      if (!targetSessionId && sessions.length > 0) {
+        targetSessionId = sessions[0].id;
+        setActiveSession(targetSessionId);
+      } else if (!targetSessionId && sessions.length === 0) {
+        const newSession = createSessionMetadata(terminalCwd, 'PowerShell', 1);
+        addSession(newSession);
+        targetSessionId = newSession.id;
+        setActiveSession(targetSessionId);
+      }
+
+      if (detail?.command && targetSessionId) {
+        // give it a tiny delay to ensure socket is connected and session exists on backend
+        window.setTimeout(() => {
+          terminalService.sendData(targetSessionId, `${detail.command}\r`);
+          const instance = xtermInstancesRef.current.get(targetSessionId);
+          if (instance) {
+            instance.xterm.focus();
+          }
+        }, 100);
       }
     };
 
     window.addEventListener('ai-web-ide:terminal-command', onTerminalCommand);
     return () => window.removeEventListener('ai-web-ide:terminal-command', onTerminalCommand);
-  }, [activeSessionId, addSession, setActiveSession, sessions.length, terminalCwd]);
+  }, [activeSessionId, addSession, setActiveSession, sessions, terminalCwd]);
 
   // Keyboard Shortcuts (Ctrl+`, Ctrl+Shift+`, Ctrl+Shift+C)
   useEffect(() => {
